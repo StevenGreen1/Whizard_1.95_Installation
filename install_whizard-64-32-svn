@@ -1,4 +1,9 @@
-export LCGENTOOLS=http://svnweb.cern.ch/guest/lcgentools/
+########### S.Green - Assuming tauola tarball has been saved to same directory as this install Whizard scripts
+# export LCGENTOOLS=http://svnweb.cern.ch/guest/lcgentools/
+# Replaced with:
+export LCGENTOOLS=http://svn.cern.ch/guest/lcgentools/
+###########
+
 #export LCGENTOOLS=file://${HOME}/lcgentools_expr_orig/
 export LCGENTAG=${1:-trunk}
 if [[ $LCGENTAG == "HEAD" ]]
@@ -398,11 +403,20 @@ make_our_whizard(){
     # 
     if [[ $2 -eq 64 ]]
     then
-      ./configure \
-       USERLIBS="$(pwd)/a6f/include/pytaud.o $(pwd)/a6f/lib/libinclude.a $TAUOLALIB/libtauola.a $PHOTOSLIB/libphotos.a"
+########## S.Green - Changing config to explicitly link to stdhep
+#      ./configure \
+#       USERLIBS="$(pwd)/a6f/include/pytaud.o $(pwd)/a6f/lib/libinclude.a $TAUOLALIB/libtauola.a $PHOTOSLIB/libphotos.a"
+#      Replaced with: 
+      ./configure --enable-stdhep FMCFIO=/usera/sg568/StdHep/stdhep/lib/libFmcfio.a STDHEP=/usera/sg568/StdHep/stdhep/lib/libstdhep.a --prefix=/usera/sg568/Whizard_1-95 USERLIBS="/usera/sg568/Whizard_1-95/whizard-1.95/a6f/include/pytaud.o /usera/sg568/Whizard_1-95/whizard-1.95/a6f/lib/libinclude.a $TAUOLALIB/libtauola.a $PHOTOSLIB/libphotos.a" F77=gfortran
+##########
     else
-      ./configure \
-       USERLIBS="$(pwd)/a6f/include/pytaud.o $(pwd)/a6f/lib/libinclude.a $TAUOLALIB/libtauola.a $PHOTOSLIB/libphotos.a"
+########## S.Green - Changing config to explicitly link to stdhep
+#      ./configure \
+#       USERLIBS="$(pwd)/a6f/include/pytaud.o $(pwd)/a6f/lib/libinclude.a $TAUOLALIB/libtauola.a $PHOTOSLIB/libphotos.a"
+#      Replaced with:
+##########
+      ./configure --enable-stdhep FMCFIO=/usera/sg568/StdHep/stdhep/lib/libFmcfio.a STDHEP=/usera/sg568/StdHep/stdhep/lib/libstdhep.a --prefix=/usera/sg568/Whizard_1-95 USERLIBS="/usera/sg568/Whizard_1-95/whizard-1.95/a6f/include/pytaud.o /usera/sg568/Whizard_1-95/whizard-1.95/a6f/lib/libinclude.a $TAUOLALIB/libtauola.a $PHOTOSLIB/libphotos.a" F77=gfortran
+
     fi
     #
     #   make our stuff. the kinds and limits modules must exist before 
