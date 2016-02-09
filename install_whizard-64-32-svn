@@ -407,7 +407,7 @@ make_our_whizard(){
 #      ./configure \
 #       USERLIBS="$(pwd)/a6f/include/pytaud.o $(pwd)/a6f/lib/libinclude.a $TAUOLALIB/libtauola.a $PHOTOSLIB/libphotos.a"
 #      Replaced with: 
-      ./configure --enable-stdhep FMCFIO=/usera/sg568/StdHep/stdhep/lib/libFmcfio.a STDHEP=/usera/sg568/StdHep/stdhep/lib/libstdhep.a --prefix=/usera/sg568/Whizard_1-95 USERLIBS="/usera/sg568/Whizard_1-95/whizard-1.95/a6f/include/pytaud.o /usera/sg568/Whizard_1-95/whizard-1.95/a6f/lib/libinclude.a $TAUOLALIB/libtauola.a $PHOTOSLIB/libphotos.a" F77=gfortran
+      ./configure --enable-stdhep FMCFIO=/usera/sg568/StdHep/stdhep/lib/libFmcfio.a STDHEP=/usera/sg568/StdHep/stdhep/lib/libstdhep.a --prefix=/usera/sg568/Whizard_1-95_3 USERLIBS="/usera/sg568/Whizard_1-95_3/whizard-1.95/a6f/include/pytaud.o /usera/sg568/Whizard_1-95_3/whizard-1.95/a6f/lib/libinclude.a $TAUOLALIB/libtauola.a $PHOTOSLIB/libphotos.a" F77=gfortran
 ##########
     else
 ########## S.Green - Changing config to explicitly link to stdhep
@@ -415,8 +415,7 @@ make_our_whizard(){
 #       USERLIBS="$(pwd)/a6f/include/pytaud.o $(pwd)/a6f/lib/libinclude.a $TAUOLALIB/libtauola.a $PHOTOSLIB/libphotos.a"
 #      Replaced with:
 ##########
-      ./configure --enable-stdhep FMCFIO=/usera/sg568/StdHep/stdhep/lib/libFmcfio.a STDHEP=/usera/sg568/StdHep/stdhep/lib/libstdhep.a --prefix=/usera/sg568/Whizard_1-95 USERLIBS="/usera/sg568/Whizard_1-95/whizard-1.95/a6f/include/pytaud.o /usera/sg568/Whizard_1-95/whizard-1.95/a6f/lib/libinclude.a $TAUOLALIB/libtauola.a $PHOTOSLIB/libphotos.a" F77=gfortran
-
+      ./configure --enable-stdhep FMCFIO=/usera/sg568/StdHep/stdhep/lib/libFmcfio.a STDHEP=/usera/sg568/StdHep/stdhep/lib/libstdhep.a --prefix=/usera/sg568/Whizard_1-95_3 USERLIBS="/usera/sg568/Whizard_1-95_3/whizard-1.95/a6f/include/pytaud.o /usera/sg568/Whizard_1-95_3/whizard-1.95/a6f/lib/libinclude.a $TAUOLALIB/libtauola.a $PHOTOSLIB/libphotos.a" F77=gfortran
     fi
     #
     #   make our stuff. the kinds and limits modules must exist before 
@@ -529,6 +528,7 @@ echo " cut-n-paste to the command line step-by-step, after reading the instructi
  define_pythia install 6.4.22 # directory of where fixups are, if empty, get from svn
 #--- # do these two if you dont already have them
  define_ocaml install 3.11 2
+
 ########### S.Green - Removed this under assumption that stdhep has been built separately according to GitHub instructions.
 # define_stdhep install 5-06-01
 # Replaced with:
@@ -536,6 +536,7 @@ echo " cut-n-paste to the command line step-by-step, after reading the instructi
  export FMCFIO=/usera/sg568/StdHep/stdhep/lib/libFmcfio.a
 ###########
 #--- # always do all the following
+
 
 ########### S.Green - Assuming tauola tarball has been saved to same directory as this install Whizard scripts 
 # define_tauola install  # name of tarfile, if empty, get from svn. ${FILES_FOR_WHIZARD_64}/tauola_desy.tar.gz
