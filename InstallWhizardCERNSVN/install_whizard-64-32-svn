@@ -1,0 +1,548 @@
+export LCGENTOOLS=http://svnweb.cern.ch/guest/lcgentools/
+#export LCGENTOOLS=file://${HOME}/lcgentools_expr_orig/
+export LCGENTAG=${1:-trunk}
+if [[ $LCGENTAG == "HEAD" ]]
+then
+  export LCGENTAG=trunk
+fi
+if [[ $LCGENTAG != "trunk" ]]
+then
+  export LCGENTAG=tags/$LCGENTAG
+fi
+
+
+gfortran -v 2>&1 >/dev/null | grep "gcc version 4.4"
+if [ $? -ne 0 ]
+then
+    echo "Required fortran version 4.4 not found"
+    exit -1
+fi
+
+
+set_gfortran44(){
+    here=`pwd`
+    mkdir bin
+    cd bin
+    ln -s `which gfortran44` gfortran
+    ln -s `which gcc44` gcc
+    export PATH=`pwd`:$PATH
+    cd $here
+}
+define_cernlib(){
+  remove_motif(){
+    # removes the compilation of binaries needing the motif
+    # libraries (Xm etc.). Only a limited set of cernlib executables
+    # will be built, but all the object libraries will be OK.
+    patch -p0 <<-"EOF"
+	--- 2005/src/packlib/kuip/Imakefile      1997-11-28 09:26:56.000000000 -0800
+	+++ 2005/src/packlib/kuip/Imakefile      2010-05-16 21:24:20.000000000 -0700
+	@@ -4,12 +4,6 @@
+	
+	 LIBDIRS= code_kuip
+	
+	-#ifndef CERNLIB_WINNT
+	-LIBDIRS := $(LIBDIRS) code_motif
+	-#else
+	-LIBDIRS := $(LIBDIRS) code_windows
+	-#endif
+	-
+	 SUBDIRS= $(LIBDIRS) programs examples kuip
+	
+	 TopOfPackage(kuip)
+	--- 2005/src/pawlib/paw/Imakefile        2000-06-27 08:27:03.000000000 -0700
+	+++ 2005/src/pawlib/paw/Imakefile        2010-05-16 21:34:08.000000000 -0700
+	@@ -9,19 +9,6 @@
+	
+	 LIBDIRS= code cpaw cdf ntuple mlpfit
+	
+	-#ifndef CERNLIB_WINNT
+	-LIBDIRS :=$(LIBDIRS) $(MOTIF_DIRS) $(PAWPP_DIRS)
+	-#endif
+	-
+	-#if defined(CERNLIB_UNIX) && !defined(CERNLIB_WINNT)
+	-MotifDependantMakeVar(PAWPP_DIRS,xbae)
+	-LIBDIRS := $(LIBDIRS) $(PAWPP_DIRS)
+	-#endif
+	-
+	-#if defined(CERNLIB_VAXVMS)
+	-MotifDependantMakeVar(PAWPP_DIRS,xbaevms)
+	-LIBDIRS := $(LIBDIRS) $(PAWPP_DIRS)
+	-#endif
+	
+	 SUBDIRS= $(LIBDIRS) programs piafs hbpiaf stagerd paw
+
+EOF
+  }
+  local here
+  here=`pwd`
+  if [[ $(getconf LONG_BIT) == "64" ]]
+  then
+    cl=cernlib_64
+  else
+    cl=cernlib
+  fi
+  if [[ "$1" ==  "install" ]] 
+  then
+    mkdir $cl
+  fi
+  cd $cl
+  if [[ "$1" ==  "install" ]] 
+  then
+    wget http://www-zeuthen.desy.de/linear_collider/cernlib/new/cernlib-2005-all-new.tgz
+    wget http://www-zeuthen.desy.de/linear_collider/cernlib/new/cernlib.2005.corr.2009.06.13.tgz
+    tar -xzf cernlib-2005-all-new.tgz
+    mv cernlib.2005.corr.tgz cernlib.2005.corr.tgz-old
+    ln -s cernlib.2005.corr.2009.06.13.tgz cernlib.2005.corr.tgz
+    alias mkdirhier=mkdir
+    # to use gfortran44 on SLC5 to compile at CERN:
+    # for whizard to compile with gfortran, 4.4 is needed, and
+    # there seems to be some subtle compatibility issues with
+    # different versions of gfortran.
+    # It seems that if whizard is compiled with ifort (not available
+    # on the NAF), of if cernlib is compiled with g77 (not available on SLC5), 
+    # whizard with gfortran4.4 it works. 
+  fi
+  if [[ "$1" ==  "install" ]] 
+  then
+    export FC=gfortran
+    if ! locate libXm.a >> /dev/null
+    then
+      csplit Install_cernlib 65
+      mv xx01 Install_cernlib_p2
+      mv xx00 Install_cernlib_p1
+      bash Install_cernlib_p1
+      remove_motif
+      bash ./Install_cernlib_p2
+    else
+      ./Install_cernlib
+    fi
+    ln -s 2005 pro
+  fi
+  . cernlib_env
+  cd $here
+}
+define_pythia(){
+  patch_pythia(){
+    local here
+    here=`pwd`
+    cd $1
+    # replace upinit.f by a (true) dummy:
+    mv upinit.f upinit.f-orig
+    # replace pydecy by our augmented version
+    mv pydecy.f pydecy.f-orig
+    if [[ "$2" == "svn" || -z "$2" ]]
+    then
+      svn export  ${LCGENTOOLS}${LCGENTAG}/updates_to_foreign/upinit.f
+      svn export  ${LCGENTOOLS}${LCGENTAG}/updates_to_foreign/pydecy.f
+    else
+      cp -a ${2}/upinit.f .
+      cp -a ${2}/pydecy.f .
+    fi 
+    touch upinit.f 
+    touch pydecy.f
+    cd $here 
+  }
+  local here
+  here=`pwd`
+  # Add latest pythia:
+  # ( three different version of the version ...)
+  ver=$2
+  ver2=$(echo $ver | sed -e s/\\./_/ | tr -d ".")
+  ver3=$(echo $ver2 | tr -d "_")
+  if [[ "$1" == "install" ]]
+  then
+    wget http://home.fnal.gov/~rhatcher/build_pythia6.sh.txt
+    mv build_pythia6.sh.txt build_pythia6.sh
+    bash build_pythia6.sh $ver gfortran
+    cd v${ver2}/src
+    patch_pythia `pwd`
+    make
+    cd ../lib/
+    mv liblund.a libpythia${ver3}.a
+  else
+    cd v${ver2}/lib
+  fi
+  export PYTHIA_LIB=$(pwd)
+  export PYTHIA_DIR=$(pwd)
+  cd $here
+}
+define_ocaml(){
+  local here
+  here=`pwd`
+  #
+  # now, Ocaml:
+  mayor=$2
+  minor=$3
+  if [[ "$1" ==  "install" ]] 
+  then
+    wget http://caml.inria.fr/pub/distrib/ocaml-${mayor}/ocaml-${mayor}.${minor}.tar.gz
+    tar -xzf ocaml-${mayor}.${minor}.tar.gz
+  fi
+  cd ocaml-${mayor}.${minor}
+  if [[ "$1" ==  "install" ]] 
+  then
+    ./configure -prefix `pwd`
+    # ( sometimes the make gets a 'Text file busy' error, this is why
+    #   it is re-run.  boot/ocamlrun gives an error, but makes the
+    #   file available in the the following step)
+    make world.opt > make.log 
+    sleep 1
+    boot/ocamlrun
+    boot/ocamlrun
+    boot/ocamlrun
+    sleep 1
+    make world.opt > make2.log
+    sleep 1 
+    boot/ocamlrun
+    boot/ocamlrun
+    boot/ocamlrun
+    sleep 1
+    make install  > makeinstall.log 
+    sleep 1
+    boot/ocamlrun
+    boot/ocamlrun
+    boot/ocamlrun
+    sleep 1
+     make install  > makeinstall2.log
+  fi
+  #  (if you already have ocaml, make sure these are defined correctly)
+  export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:`pwd`/lib
+  export PATH=$PATH:`pwd`/bin
+  cd $here
+}
+define_stdhep(){
+  local here
+  here=`pwd`
+  #
+  # Now, stdhep:
+  #
+  vers=$2
+  if [[ "$1" ==  "install" ]] 
+  then
+    wget http://cepa.fnal.gov/psm/stdhep/dist/stdhep-${vers}.tar.gz
+    tar -xzf stdhep-${vers}.tar.gz
+  fi
+  cd stdhep-${vers}
+  if [[ "$1" ==  "install" ]] 
+  then
+    # patch the arch-files read by make to replave g77 by gforran (is there a better way ?!)
+    patch -p0 <<-"!"
+	--- ./src/stdhep_arch   2007-11-06 23:59:42.000000000 +0100
+	+++ /afs/naf.desy.de/user/b/berggren/me@desy/stdhep_arch        2012-02-10 15:09:26.000000000 +0100
+	@@ -58,10 +58,10 @@
+	 ifeq "$(UNAME)" "Linux"
+	     CC=gcc
+	     CPP=gcc -E
+	-    F77=g77
+	+    F77=gfortran
+	     CFLAGS= $(DFLG)
+	     CXFLAGS = -I/usr/X11R6/include
+	-    FFLAGS= $(DFLG) -fno-second-underscore
+	+    FFLAGS= $(DFLG) -fno-second-underscore  -fd-lines-as-comments
+	     KPPFLAGS= -C -P -DLinux -DUNIX
+	     LOCAL = -lnsl -lm
+	     #BUILD_SHARED = true
+!
+    patch -p0 <<-"!"
+	--- ./mcfio/arch_mcfio  2006-09-13 23:21:53.000000000 +0200
+	+++ /afs/naf.desy.de/user/b/berggren/me@desy/arch_mcfio 2012-02-10 15:09:16.000000000 +0100
+	@@ -34,9 +34,9 @@
+	 endif
+	 ifeq "$(UNAME)" "Linux"
+	     CC=gcc
+	-    F77=g77
+	+    F77=gfortran
+	     CFLAGS= $(DFLG) -I/usr/X11R6/include 
+	-    FFLAGS= $(DFLG) -fdebug-kludge -fno-second-underscore
+	+    FFLAGS= $(DFLG) -fno-second-underscore
+	     MXTLIBS = -L/usr/X11R6/lib -lXm -lX11 -lXt -lXp -lXext -lm
+	     #BUILD_SHARED = true
+	     SHFLAG = -fPIC
+!
+    cd src/stdhep
+    patch -p0 <<-"!"
+	--- stdxwinit.F-old	2012-03-02 12:55:13.000000000 +0100
+	+++ stdxwinit.F	2012-03-02 12:56:34.000000000 +0100
+	@@ -13,7 +13,8 @@
+	 
+	       logical lfirst
+	       data lfirst/.TRUE./
+	-      save lfirst
+	+      data lnhout /6/
+	+      save lfirst
+	 
+	 C...print version number if this is the first call
+	       if(lfirst)then
+!
+    cd ../..
+    export STDHEP_DIR=`pwd`
+    gmake all
+  fi
+  # (if you already have stdhep-64 make sure this is set. Whizard
+  # and stdhep itself have different opinions on what this should
+  # point to)
+  export STDHEP_DIR=`pwd`/lib
+  cd $here
+}
+define_tauola(){
+  local here
+  here=`pwd`
+  #
+  #  Now, our TAUOLA :
+  #
+  if [[ "$1" ==  "install" ]] 
+  then
+    if [[ "$2" == "svn" || -z "$2" ]]
+    then
+      svn export  ${LCGENTOOLS}${LCGENTAG}/updates_to_foreign/tauola_desy.tar.gz
+      tar -xzf tauola_desy.tar.gz
+    else
+      tar -xzf $2
+    fi
+  fi
+  cd tauola_desy/TAUOLA/
+  if [[ "$1" ==  "install" ]] 
+  then
+    export WHZ=`pwd`/../..
+    #
+    #  (make sure make.inc points to the right architecture)
+    #
+    # Make photos. 4kD-all to get the consitant shape of /HEPEVT/
+    cd photos-F/
+    make 4kD-all
+    cd ..
+    # make the rest. There will be an error, but it doesn't
+    # matter, it happens after the libraries have been made...
+    bash make_tauola_script
+    cd tauola
+    make
+    mv glib.a libtauola.a
+    cd ..
+    cd photos
+    mv glib.a libphotos.a
+    cd ..
+  fi
+  export TAUOLALIB=`pwd`/tauola
+  export PHOTOSLIB=`pwd`/photos
+  cd $here
+}
+define_whizard(){
+  export F95=`which gfortran`
+  # (for gfortran, needed for our user.f90 and for a6f. Means that there is
+  # no restriction on line-length. The f95 standard defines max line-length
+  # to 132, which apearently ifort and lf95 ingnores)
+  export FCFLAGS="-ffree-line-length-0"
+  export F77=$F95
+  export energy_spread=`pwd`/energy_spread
+
+}
+define_lumi_files(){
+    local here
+    here=`pwd`
+    export energy_spread=`pwd`/energy_spread
+    export LUMI_LINKER=${energy_spread}/lumi_linker_000
+    export PHOTONS_B1=${energy_spread}/photons_beam1_linker_000
+    export PHOTONS_B2=${energy_spread}/photons_beam2_linker_000
+    export EBEAM=${energy_spread}/ebeam_in_linker_000
+    export PBEAM=${energy_spread}/pbeam_in_linker_000
+    export LUMI_EE_LINKER=${energy_spread}/lumi_ee_linker_000
+    export LUMI_EG_LINKER=${energy_spread}/lumi_eg_linker_000
+    export LUMI_GE_LINKER=${energy_spread}/lumi_ge_linker_000
+    export LUMI_GG_LINKER=${energy_spread}/lumi_gg_linker_000
+    cd $here
+}
+make_our_whizard(){
+  install_default_whizard(){
+    #
+    # Finally: whizard
+    #
+    local here
+    here=`pwd`
+    vers=$1
+    if [[ "$2" == "svn" || -z "$2" ]]
+    then
+      svn export ${LCGENTOOLS}${LCGENTAG}/Whizard_${vers}  whizard-${vers}/
+    else
+      if [[ "$2" != "whizard-${vers}" ]]
+      then
+        ln -s $2 whizard-${vers}
+      fi
+    fi
+    #
+    cd $here
+  }
+
+  install_lumi_files(){
+    #
+    #  the lumi-files
+    #
+    local here
+    here=`pwd`
+    if [[ "$1" == "svn" || -z "$1" ]]
+    then
+      svn export ${LCGENTOOLS}${LCGENTAG}/energy_spread/
+    else
+      tar -xzf $1 
+    fi
+    cd $here
+  }
+
+  compile_whizard(){
+    local here
+    here=`pwd`
+    cd whizard-$1
+    #
+    #  and configure: g2c because stdhep is compiled by g77, pytaud.o explicitly
+    #  since otherwise the dummy version in pythia will be loaded. I prefere
+    #  explicit paths rather than -L -l combinations, which gives less control
+    # 
+    if [[ $2 -eq 64 ]]
+    then
+      ./configure \
+       USERLIBS="$(pwd)/a6f/include/pytaud.o $(pwd)/a6f/lib/libinclude.a $TAUOLALIB/libtauola.a $PHOTOSLIB/libphotos.a"
+    else
+      ./configure \
+       USERLIBS="$(pwd)/a6f/include/pytaud.o $(pwd)/a6f/lib/libinclude.a $TAUOLALIB/libtauola.a $PHOTOSLIB/libphotos.a"
+    fi
+    #
+    #   make our stuff. the kinds and limits modules must exist before 
+    #
+    cd kinds-src
+    make install
+    cd ..
+    cd vamp-src
+    make install
+    cd ..
+    cd whizard-src
+    $F95 $FCFLAGS  -I../include -c mpi90.f90 limits.f90  diagnostics.f90
+    cd ..
+    make -C a6f/include/  A6F=.. WHIZ=../.. WH195=../.. SHELL=/bin/bash
+    #  
+    #
+    cd $here
+  }
+  build_whizard_models(){
+    local here
+    here=`pwd`
+    cd whizard-$1
+    cd conf
+    shift
+    for file in $@
+    do
+      svn export  ${LCGENTOOLS}${LCGENTAG}/ILC/models/DBD/${file}
+    done
+    cp $@ .
+    cp whizard.prc-4f whizard.prc
+    cp whizard.in_OPAL_tauola whizard.in
+    cp whizard.mdl-4f whizard.mdl
+    cd ..
+    make prg install
+    cd $here
+  }
+  here=`pwd`
+  whizvers=$1
+  install_default_whizard ${whizvers} $3
+  install_lumi_files 
+  compile_whizard ${whizvers} $2
+  
+  build_whizard_models ${whizvers} \
+          whizard.prc-msugra_1  \
+          whizard.prc.NMSSM \
+          whizard.prc-point5 \
+          whizard.in-msugra-1 \
+          whizard.in_OPAL_tauola \
+          whizard.prc-4f \
+          whizard.mdl \
+          whizard.prc-2f \
+          whizard.cut1
+  cd $here
+}
+versions(){
+  echo ">>> lcgentools version :"
+  echo $LCGENTAG
+  echo ">>> whizard version :"
+  ./whizard  --version
+  echo ">>> cernlib version :"
+  echo $CERN_LEVEL
+  if  which rpm 1>/dev/null 2>&1
+  then
+    echo ">>> glibc version : "
+    rpm -q glibc
+  else
+    echo " Sorry, you're not rpm-based, so you need to find the glibc version by yourself ... "
+  fi
+  echo ">>> OS version : "
+  uname -rmo
+  echo ">>> gfortran/gcc version:"
+  gfortran --version
+  echo ">>> pythia version :"
+  echo $PYTHIA_LIB
+  # ls $CERN/$CERN_LEVEL/lib/libpythia*.a
+  echo ">>> stdhep version :"
+  echo $STDHEP_DIR
+}
+
+echo " Do: "
+echo '   grep "#---" install_whizard-64-32-svn | sed -e s/#---//'
+echo " cut-n-paste to the command line step-by-step, after reading the instructions"
+
+# If you are brave, remove the "#---" and run it all.
+# Otherwise, cut-n-paste to the bash command-line and check
+# each step....
+# one-liner for this :  grep "#---" install_whizard-64-32-svn-002 | sed -e s/#---//
+ # detect processor word length:
+ if cat /proc/cpuinfo | grep flags | tr " " "\n" | sort -u | grep -q "^lm$"
+ then
+   proc_wl=64
+ elif cat /proc/cpuinfo | grep flags | tr " " "\n" | sort -u | grep -q "^tm$"
+ then
+   proc_wl=32
+ fi
+ # detect kernel word length:
+ kern_wl=$(getconf LONG_BIT)
+ if [[ $kern_wl -ne $proc_wl ]]
+ then
+   echo " processor ( $proc_wl ) and kernel ( $kern_wl ) word-lengths differ ..."
+ fi
+ # do this if "gfortran --version" tells you you have a lower versio than 4.4
+#--  # and "which gfortran44" gives an non-null answer. This is the SL5 situation !
+ #set_gfortran44
+#--- # install cernlib if: your default gfortran is not v4.4 (or higher) and/or your
+#--- # kernel is a 64-bit one ($kern_wl above evaluates to 64)
+ define_cernlib
+#--- # always do this. Apart from installing exactly v6.4.22, there are a few hacks done by this
+#--- # procedure that are needed for our whizard version
+ define_pythia install 6.4.22 # directory of where fixups are, if empty, get from svn
+#--- # do these two if you dont already have them
+ define_ocaml install 3.11 2
+ define_stdhep install 5-06-01
+#--- # always do all the following
+ define_tauola install  # name of tarfile, if empty, get from svn. ${FILES_FOR_WHIZARD_64}/tauola_desy.tar.gz
+ define_whizard
+ make_our_whizard 1.95 $kern_wl # (name of whizard directory, if empty, get from svn)
+ define_lumi_files # name of tarfile, if empty, get from svn. 
+#--- # test it:
+#--- cd whizard-1.95/results
+#---   ./whizard --process_input 'process_id = "zz_l0mumu" luminosity = 0' \
+#---             --integration_input 'calls = 1  25000 10  25000 1  25000' \
+#---             --simulation_input 'write_events_file = "zz_l0mumu" n_events = 100' \
+#---             --diagnostics_input 'chattiness = 1'
+#--- # list of versions etc needed for the semi-static part of the production
+#--- # meta-data 
+#--- versions
+# Size of all: 1.4 GB (220 MB in whizard-1.95/results, ie. the test,
+# 100 MB in tar-balls that can be removed)
+#--- #to define the environment on a system where all has been
+#--- #previously installed:
+#---   . install_whizard-64-32-svn
+#--- #  cd to the top-directory of the install
+#--- # then:
+#---  set_gfortran44 # if needed
+#---  define_cernlib define
+#---  define_pythia define 6.4.22 
+#---  define_ocaml define 3.11 2
+#---  define_stdhep define 5-06-01
+#---  define_tauola define 
+#---  define_whizard
+#---  define_lumi_files
+#--- # A good idea is to put these statments into your .bashrc/.chsrc
