@@ -1,0 +1,76 @@
+\documentclass[11pt, oneside]{article}   	% use "amsart" instead of "article" for AMSLaTeX format
+\usepackage{geometry}                		% See geometry.pdf to learn the layout options. There are lots.
+\usepackage{color}
+\geometry{letterpaper}                   		% ... or a4paper or a5paper or ... 
+%\geometry{landscape}                		% Activate for for rotated page geometry
+%\usepackage[parfill]{parskip}    		% Activate to begin paragraphs with an empty line rather than an indent
+\usepackage{graphicx}				% Use pdf, png, jpg, or epsÂ§ with pdflatex; use eps in DVI mode
+								% TeX will automatically convert eps --> pdf in pdflatex		
+\usepackage{amssymb}
+
+\title{Building Whizard 1.95}
+\author{Steve Green}
+\date{}							% Activate to display a given date or no date
+
+\begin{document}
+\maketitle
+It is necessary to have an sl5 machine to use relevant fortran compliers.
+Begin by sourcing: /afs/cern.ch/sw/lcg/contrib/gcc/4.4.3/x86\_64-slc5-gcc44-opt/setup.sh (or setup.sh from the GitHub page.)
+Copy cernlib into local directory: /afs/cern.ch/eng/clic/software/cernlib\_64/
+Retrieve following file via ssh: svn+ssh://CERN\_ID@svn.cern.ch/reps/clicdet/trunk/generators/whizard\_195/install\_whizard-64-32-svn (or via 	InstallWhizardCERNSVN/install\_whizard-64-32-svn from the GitHub page.)
+Then you need to run the install\_whizard-64-32-svn script after making the changes to the script described below.
+
+\section{Purpose of script}
+
+This script is designed to download and install:
+\begin{enumerate}
+\item OCaml a programming language used by Whizard.
+\item Stdhep, which is a fortran based program used for even generation.
+\item Tauola, which processes the decays of taus.
+\item Pythia 6.4.22.  This deals with the hadronisation of quarks.
+\end{enumerate}
+
+\section{Changes to script}
+\subsection{Sourcing}
+To enable download from the CERN svn I found it was necessary to change the first line of the script \textbf{from:} \newline
+export LCGENTOOLS=https://svn\textcolor{red}{web}.cern.ch/guest/lcgentools \newline
+
+\textbf{To:} \newline
+export LCGENTOOLS=https://svn.cern.ch/guest/lcgentools \newline
+
+\subsection{StdHep}
+It was necessary to build a local copy of the stdhep library to link to Whizard as the referenced stdhep libraries no longer exist.  This is easily done by the following commands:
+\begin{enumerate}
+\item Make a stdhep directory and cd into it.
+\item Run the command: cvs -d :pserver:anonymous@cdcvs.fnal.gov:/cvs/pat\_read\_only co stdhep
+\item To check everything works it is sensible to rebuild the libraries here.  This requires an sl5 machine to do and gfortran.  The sourced CERN script has an appropriate version of gfortran.  There are three commans, gmake clean, gmake all and gmake DEBUG=-g all to follow.  The details of this can be found in the stdhep README.
+\item This should give you the two libraries you need to interface to Whizard and are used at the configuration stage of Whizard:
+  \begin{enumerate}
+  \item \$\{STDHEP\_DIR\}/lib/libstdhep.a
+  \item  \$\{STDHEP\_DIR\}/lib/libFmcfio.a
+  \end{enumerate}
+\end{enumerate}
+\textbf{If you do this make sure that the version of gfortran you use here is the same as that used for building Whizard!}  If you source the setup.sh script at the start of this process then it should be sufficient for building both stdhep and Whizard.
+
+\subsection{Tauola}
+If you have any difficulties downloading Tauola for Whizard then a copy of the relevant tarball is included in this GitHub page.  If you wish to use this you must change the define\_tauola install command with define\_tauola install tauola\_desy.tar.gz command in the install\_whizard-64-32-svn script. 
+
+\subsection{Configuration}
+It was necessary to explicitly declare the path to the stdhep libraries when configuring Whizard.  This was done by changing the config lines in install\_whizard-64-32-svn.  Specifically they were changes \textbf{from:}
+\newline
+ ./configure USERLIBS="\$(pwd)/a6f/include/pytaud.o \$(pwd)/a6f/lib/libinclude.a \$TAUOLALIB/libtauola.a \$PHOTOSLIB/libphotos.a"
+\newline
+
+\textbf{To:}
+\newline
+ ./configure --enable-stdhep FMCFIO=\$\{STDHEP\_DIR\}/lib/libFmcfio.a \newline
+ STDHEP=\$\{STDHEP\_DIR\}/lib/libstdhep.a \newline
+ --prefix=/usera/sg568/Whizard\_1-95 \newline
+ USERLIBS="\$(pwd)/a6f/include/pytaud.o \$(pwd)/a6f/lib/libinclude.a \newline
+ \$TAUOLALIB/libtauola.a \$PHOTOSLIB/libphotos.a" \newline
+ F77=gfortran
+
+%\section{}
+%\subsection{}
+
+\end{document}  
